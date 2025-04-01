@@ -1,14 +1,16 @@
+import json
+import mimetypes
 import os
+import platform
+import shutil
 import subprocess
 import tempfile
-import platform
-import json
-import shutil
-from pathlib import Path
-import mimetypes
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel, Field
 
 # Initialize the MCP server
 mcp = FastMCP()
@@ -45,14 +47,164 @@ if SYSTEM == "Windows":
     try:
         from windows_utils import (
             get_windows_drives,
-            get_windows_special_folders,
             get_windows_environment,
+            get_windows_special_folders,
             get_windows_system_info,
+            is_valid_windows_path,
             normalize_windows_path,
-            is_valid_windows_path
         )
     except ImportError:
         print("Windows utilities could not be imported. Some features may be limited.")
+
+# Pydantic models for request and response validation
+class FileMetadata(BaseModel):
+    path: str
+    name: str
+    size: int
+    created: str
+    modified: str
+    type: str
+    preview: Optional[str] = None
+    line_count: Optional[int] = None
+    preview_error: Optional[str] = None
+    error: Optional[str] = None
+
+class FileContent(BaseModel):
+    path: str
+    name: str
+    content: str
+    size: int
+    error: Optional[str] = None
+
+class FileWriteResult(BaseModel):
+    success: bool
+    path: str
+    name: str
+    size: int
+    mode: str
+    error: Optional[str] = None
+
+class FileMatch(BaseModel):
+    context: str
+    line: int
+
+class FileSearchResult(BaseModel):
+    path: str
+    name: str
+    size: int
+    created: str
+    modified: str
+    type: str
+    match: Optional[FileMatch] = None
+    error: Optional[str] = None
+
+class DirectoryItem(BaseModel):
+    name: str
+    path: str
+
+class FileItem(BaseModel):
+    name: str
+    path: str
+    size: int
+    type: str
+
+class DirectoryListing(BaseModel):
+    path: str
+    files: List[FileItem]
+    directories: List[DirectoryItem]
+    file_count: int
+    directory_count: int
+    error: Optional[str] = None
+
+class DriveInfo(BaseModel):
+    path: str
+    type: str
+
+class DriveListing(BaseModel):
+    drives: List[DriveInfo]
+    error: Optional[str] = None
+
+class CollectionResult(BaseModel):
+    collection: str
+    file_count: int
+    path: str
+    error: Optional[str] = None
+
+class SystemInfo(BaseModel):
+    system: str
+    node: str
+    release: str
+    version: str
+    machine: str
+    processor: str
+    python_version: str
+    user_home: str
+    windows_error: Optional[str] = None
+    environment_error: Optional[str] = None
+
+class SystemInfoResult(BaseModel):
+    system_info: SystemInfo
+    error: Optional[str] = None
+
+class FileCopyResult(BaseModel):
+    success: bool
+    source: str
+    destination: str
+    size: int
+    error: Optional[str] = None
+
+class FileMoveResult(BaseModel):
+    success: bool
+    source: str
+    destination: str
+    size: int
+    error: Optional[str] = None
+
+class FileDeleteInfo(BaseModel):
+    path: str
+    name: str
+    size: int
+
+class FileDeleteResult(BaseModel):
+    success: bool
+    deleted_file: FileDeleteInfo
+    error: Optional[str] = None
+
+class DirectoryCreateResult(BaseModel):
+    success: bool
+    path: str
+    error: Optional[str] = None
+
+class ScanDirectoryResult(BaseModel):
+    directory: str
+    file_count: int
+    files: List[FileMetadata]
+    error: Optional[str] = None
+
+class SearchFilesResult(BaseModel):
+    directory: str
+    query: str
+    match_count: int
+    matches: List[FileMetadata]
+    error: Optional[str] = None
+
+class SearchFileContentsResult(BaseModel):
+    directory: str
+    query: str
+    match_count: int
+    matches: List[FileSearchResult]
+    error: Optional[str] = None
+
+class UserDirectoriesResult(BaseModel):
+    directories: Dict[str, str]
+    error: Optional[str] = None
+
+class RecursiveDirectoryListing(BaseModel):
+    path: str
+    structure: str
+    file_count: int
+    directory_count: int
+    error: Optional[str] = None
 
 # Helper functions
 def get_file_type(file_path):
@@ -150,9 +302,17 @@ def get_file_metadata(file_path):
             except Exception as e:
                 metadata["preview_error"] = str(e)
         
-        return metadata
+        return FileMetadata(**metadata)
     except Exception as e:
-        return {"error": str(e)}
+        return FileMetadata(
+            path=file_path,
+            name=os.path.basename(file_path),
+            size=0,
+            created=datetime.now().isoformat(),
+            modified=datetime.now().isoformat(),
+            type="unknown",
+            error=str(e)
+        )
 
 def scan_directory(directory_path, recursive=True, file_types=None):
     """Scan a directory for files."""
@@ -186,11 +346,23 @@ def read_text_file(file_path, max_lines=None):
     """Read a text file and return its contents."""
     try:
         if not os.path.isfile(file_path):
-            return {"error": f"File not found: {file_path}"}
+            return FileContent(
+                path=file_path,
+                name=os.path.basename(file_path),
+                content="",
+                size=0,
+                error=f"File not found: {file_path}"
+            )
         
         file_type = get_file_type(file_path)
         if file_type not in ['text', 'code', 'document']:
-            return {"error": f"Not a text file: {file_path}"}
+            return FileContent(
+                path=file_path,
+                name=os.path.basename(file_path),
+                content="",
+                size=os.path.getsize(file_path),
+                error=f"Not a text file: {file_path}"
+            )
         
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             if max_lines:
@@ -205,14 +377,20 @@ def read_text_file(file_path, max_lines=None):
             else:
                 content = f.read()
         
-        return {
-            "path": file_path,
-            "name": os.path.basename(file_path),
-            "content": content,
-            "size": os.path.getsize(file_path)
-        }
+        return FileContent(
+            path=file_path,
+            name=os.path.basename(file_path),
+            content=content,
+            size=os.path.getsize(file_path)
+        )
     except Exception as e:
-        return {"error": str(e)}
+        return FileContent(
+            path=file_path,
+            name=os.path.basename(file_path),
+            content="",
+            size=0,
+            error=str(e)
+        )
 
 def write_text_file(file_path, content, append=False):
     """Write content to a text file."""
@@ -221,15 +399,22 @@ def write_text_file(file_path, content, append=False):
         with open(file_path, mode, encoding='utf-8') as f:
             f.write(content)
         
-        return {
-            "success": True,
-            "path": file_path,
-            "name": os.path.basename(file_path),
-            "size": os.path.getsize(file_path),
-            "mode": "append" if append else "write"
-        }
+        return FileWriteResult(
+            success=True,
+            path=file_path,
+            name=os.path.basename(file_path),
+            size=os.path.getsize(file_path),
+            mode="append" if append else "write"
+        )
     except Exception as e:
-        return {"error": str(e)}
+        return FileWriteResult(
+            success=False,
+            path=file_path,
+            name=os.path.basename(file_path),
+            size=0,
+            mode="append" if append else "write",
+            error=str(e)
+        )
 
 def search_files(directory_path, query, recursive=True, file_types=None):
     """Search for files matching a query in a directory."""
@@ -297,12 +482,15 @@ def search_file_contents(directory_path, query, recursive=True, file_types=None,
                                     # Find line number
                                     line_number = content[:index].count('\n') + 1
                                     
-                                    metadata["match"] = {
-                                        "context": content[start:end],
-                                        "line": line_number
-                                    }
+                                    file_search_result = FileSearchResult(
+                                        **metadata.dict(),
+                                        match=FileMatch(
+                                            context=content[start:end],
+                                            line=line_number
+                                        )
+                                    )
                                     
-                                    results.append(metadata)
+                                    results.append(file_search_result)
                                     count += 1
                         except Exception:
                             # Skip files that can't be read as text
@@ -332,12 +520,15 @@ def search_file_contents(directory_path, query, recursive=True, file_types=None,
                                     # Find line number
                                     line_number = content[:index].count('\n') + 1
                                     
-                                    metadata["match"] = {
-                                        "context": content[start:end],
-                                        "line": line_number
-                                    }
+                                    file_search_result = FileSearchResult(
+                                        **metadata.dict(),
+                                        match=FileMatch(
+                                            context=content[start:end],
+                                            line=line_number
+                                        )
+                                    )
                                     
-                                    results.append(metadata)
+                                    results.append(file_search_result)
                                     count += 1
                         except Exception:
                             # Skip files that can't be read as text
@@ -349,7 +540,7 @@ def search_file_contents(directory_path, query, recursive=True, file_types=None,
 
 # MCP Tool: Scan Directory
 @mcp.tool()
-def scan_directory_tool(directory_path: str, recursive: bool = True, file_types: list = None):
+def scan_directory_tool(directory_path: str, recursive: bool = True, file_types: list = None) -> Dict[str, Any]:
     """
     Scan a directory for files.
     
@@ -368,20 +559,33 @@ def scan_directory_tool(directory_path: str, recursive: bool = True, file_types:
     
     # Check if the directory exists
     if not os.path.isdir(directory_path):
-        return {"error": f"Directory not found: {directory_path}"}
+        return ScanDirectoryResult(
+            directory=directory_path,
+            file_count=0,
+            files=[],
+            error=f"Directory not found: {directory_path}"
+        ).model_dump()
     
     # Scan the directory
     results = scan_directory(directory_path, recursive, file_types)
     
-    return {
-        "directory": directory_path,
-        "file_count": len(results) if isinstance(results, list) else 0,
-        "files": results
-    }
+    if isinstance(results, dict) and "error" in results:
+        return ScanDirectoryResult(
+            directory=directory_path,
+            file_count=0,
+            files=[],
+            error=results["error"]
+        ).model_dump()
+    
+    return ScanDirectoryResult(
+        directory=directory_path,
+        file_count=len(results),
+        files=results
+    ).model_dump()
 
 # MCP Tool: Get File Metadata
 @mcp.tool()
-def get_file_metadata_tool(file_path: str):
+def get_file_metadata_tool(file_path: str) -> Dict[str, Any]:
     """
     Get metadata for a file.
     
@@ -398,16 +602,24 @@ def get_file_metadata_tool(file_path: str):
     
     # Check if the file exists
     if not os.path.isfile(file_path):
-        return {"error": f"File not found: {file_path}"}
+        return FileMetadata(
+            path=file_path,
+            name=os.path.basename(file_path),
+            size=0,
+            created=datetime.now().isoformat(),
+            modified=datetime.now().isoformat(),
+            type="unknown",
+            error=f"File not found: {file_path}"
+        ).model_dump()
     
     # Get the file metadata
     metadata = get_file_metadata(file_path)
     
-    return metadata
+    return metadata.model_dump()
 
 # MCP Tool: List Drives (Windows-specific)
 @mcp.tool()
-def list_drives():
+def list_drives() -> Dict[str, Any]:
     """
     List available drives on Windows.
     
@@ -415,46 +627,37 @@ def list_drives():
         A list of available drives
     """
     if SYSTEM != "Windows":
-        return {"error": "This function is only available on Windows"}
+        return DriveListing(
+            drives=[],
+            error="This function is only available on Windows"
+        ).model_dump()
     
     try:
         if 'get_windows_drives' in globals():
             return get_windows_drives()
         
-        import win32api
-        drives = win32api.GetLogicalDriveStrings()
-        drives = drives.split('\000')[:-1]
+        # Use a simpler approach to get drive information
+        drives = []
+        for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
+            drive = f"{letter}:\\"
+            if os.path.exists(drive):
+                # Try to determine drive type by checking if it's a mount point
+                drive_type = "Fixed" if os.path.ismount(drive) else "Unknown"
+                drives.append(DriveInfo(
+                    path=drive,
+                    type=drive_type
+                ))
         
-        drive_info = []
-        for drive in drives:
-            try:
-                drive_type = win32api.GetDriveType(drive)
-                type_name = {
-                    0: "Unknown",
-                    1: "No Root Directory",
-                    2: "Removable",
-                    3: "Fixed",
-                    4: "Network",
-                    5: "CD-ROM",
-                    6: "RAM Disk"
-                }.get(drive_type, "Unknown")
-                
-                drive_info.append({
-                    "path": drive,
-                    "type": type_name
-                })
-            except:
-                pass
-        
-        return {"drives": drive_info}
-    except ImportError:
-        return {"error": "win32api module not available. Install pywin32 package."}
+        return DriveListing(drives=drives).model_dump()
     except Exception as e:
-        return {"error": str(e)}
+        return DriveListing(
+            drives=[],
+            error=str(e)
+        ).model_dump()
 
 # MCP Tool: Create Collection
 @mcp.tool()
-def create_collection(name: str, file_paths: list):
+def create_collection(name: str, file_paths: list) -> Dict[str, Any]:
     """
     Create a collection of files.
     
@@ -466,33 +669,42 @@ def create_collection(name: str, file_paths: list):
         Information about the created collection
     """
     collection_dir = os.path.join(COLLECTIONS_DIR, name)
-    os.makedirs(collection_dir, exist_ok=True)
     
-    collection_info = {
-        "name": name,
-        "created": datetime.now().isoformat(),
-        "files": []
-    }
-    
-    for file_path in file_paths:
-        if os.path.isfile(file_path):
-            file_name = os.path.basename(file_path)
-            metadata = get_file_metadata(file_path)
-            collection_info["files"].append(metadata)
-    
-    # Save collection info
-    with open(os.path.join(collection_dir, "collection.json"), "w") as f:
-        json.dump(collection_info, f, indent=2)
-    
-    return {
-        "collection": name,
-        "file_count": len(collection_info["files"]),
-        "path": collection_dir
-    }
+    try:
+        os.makedirs(collection_dir, exist_ok=True)
+        
+        collection_info = {
+            "name": name,
+            "created": datetime.now().isoformat(),
+            "files": []
+        }
+        
+        for file_path in file_paths:
+            if os.path.isfile(file_path):
+                file_name = os.path.basename(file_path)
+                metadata = get_file_metadata(file_path)
+                collection_info["files"].append(metadata.model_dump())
+        
+        # Save collection info
+        with open(os.path.join(collection_dir, "collection.json"), "w") as f:
+            json.dump(collection_info, f, indent=2)
+        
+        return CollectionResult(
+            collection=name,
+            file_count=len(collection_info["files"]),
+            path=collection_dir
+        ).model_dump()
+    except Exception as e:
+        return CollectionResult(
+            collection=name,
+            file_count=0,
+            path=collection_dir,
+            error=str(e)
+        ).model_dump()
 
 # MCP Tool: List User Directories
 @mcp.tool()
-def list_user_directories():
+def list_user_directories() -> Dict[str, Any]:
     """
     List common user directories based on the operating system.
     
@@ -501,76 +713,82 @@ def list_user_directories():
     """
     directories = {}
     
-    if SYSTEM == "Windows":
-        # Windows user directories
-        for dir_name in ["Desktop", "Documents", "Pictures", "Videos", "Music", "Downloads", "AppData"]:
-            path = os.path.join(os.path.expanduser("~"), dir_name)
-            if os.path.isdir(path):
-                directories[dir_name] = path
-        
-        # Windows special folders if available
-        if 'get_windows_special_folders' in globals():
-            try:
-                special_folders = get_windows_special_folders()
-                if isinstance(special_folders, dict) and "special_folders" in special_folders:
-                    directories.update(special_folders["special_folders"])
-            except Exception:
-                pass
-    
-    elif SYSTEM == "Darwin":  # macOS
-        # macOS user directories
-        for dir_name, folder in [
-            ("Desktop", "Desktop"),
-            ("Documents", "Documents"),
-            ("Pictures", "Pictures"),
-            ("Movies", "Movies"),
-            ("Music", "Music"),
-            ("Downloads", "Downloads"),
-            ("Applications", "Applications"),
-            ("Library", "Library")
-        ]:
-            path = os.path.join(os.path.expanduser("~"), folder)
-            if os.path.isdir(path):
-                directories[dir_name] = path
-    
-    else:  # Linux
-        # Linux user directories (using XDG)
-        try:
-            import subprocess
-            for dir_name, xdg_key in [
-                ("Desktop", "DESKTOP"),
-                ("Documents", "DOCUMENTS"),
-                ("Pictures", "PICTURES"),
-                ("Videos", "VIDEOS"),
-                ("Music", "MUSIC"),
-                ("Downloads", "DOWNLOAD"),
-                ("Templates", "TEMPLATES"),
-                ("Public", "PUBLICSHARE")
-            ]:
-                try:
-                    path = subprocess.check_output(
-                        ["xdg-user-dir", xdg_key], 
-                        universal_newlines=True
-                    ).strip()
-                    if os.path.isdir(path):
-                        directories[dir_name] = path
-                except:
-                    # Fallback to standard directories
-                    path = os.path.join(os.path.expanduser("~"), dir_name)
-                    if os.path.isdir(path):
-                        directories[dir_name] = path
-        except:
-            # Fallback if xdg-user-dir is not available
-            for dir_name in ["Desktop", "Documents", "Pictures", "Videos", "Music", "Downloads"]:
+    try:
+        if SYSTEM == "Windows":
+            # Windows user directories
+            for dir_name in ["Desktop", "Documents", "Pictures", "Videos", "Music", "Downloads", "AppData"]:
                 path = os.path.join(os.path.expanduser("~"), dir_name)
                 if os.path.isdir(path):
                     directories[dir_name] = path
-    
-    return {"directories": directories}
+            
+            # Windows special folders if available
+            if 'get_windows_special_folders' in globals():
+                try:
+                    special_folders = get_windows_special_folders()
+                    if isinstance(special_folders, dict) and "special_folders" in special_folders:
+                        directories.update(special_folders["special_folders"])
+                except Exception:
+                    pass
+        
+        elif SYSTEM == "Darwin":  # macOS
+            # macOS user directories
+            for dir_name, folder in [
+                ("Desktop", "Desktop"),
+                ("Documents", "Documents"),
+                ("Pictures", "Pictures"),
+                ("Movies", "Movies"),
+                ("Music", "Music"),
+                ("Downloads", "Downloads"),
+                ("Applications", "Applications"),
+                ("Library", "Library")
+            ]:
+                path = os.path.join(os.path.expanduser("~"), folder)
+                if os.path.isdir(path):
+                    directories[dir_name] = path
+        
+        else:  # Linux
+            # Linux user directories (using XDG)
+            try:
+                import subprocess
+                for dir_name, xdg_key in [
+                    ("Desktop", "DESKTOP"),
+                    ("Documents", "DOCUMENTS"),
+                    ("Pictures", "PICTURES"),
+                    ("Videos", "VIDEOS"),
+                    ("Music", "MUSIC"),
+                    ("Downloads", "DOWNLOAD"),
+                    ("Templates", "TEMPLATES"),
+                    ("Public", "PUBLICSHARE")
+                ]:
+                    try:
+                        path = subprocess.check_output(
+                            ["xdg-user-dir", xdg_key], 
+                            universal_newlines=True
+                        ).strip()
+                        if os.path.isdir(path):
+                            directories[dir_name] = path
+                    except:
+                        # Fallback to standard directories
+                        path = os.path.join(os.path.expanduser("~"), dir_name)
+                        if os.path.isdir(path):
+                            directories[dir_name] = path
+            except:
+                # Fallback if xdg-user-dir is not available
+                for dir_name in ["Desktop", "Documents", "Pictures", "Videos", "Music", "Downloads"]:
+                    path = os.path.join(os.path.expanduser("~"), dir_name)
+                    if os.path.isdir(path):
+                        directories[dir_name] = path
+        
+        return UserDirectoriesResult(directories=directories).model_dump()
+    except Exception as e:
+        return UserDirectoriesResult(
+            directories={},
+            error=str(e)
+        ).model_dump()
 
 # MCP Tool: Read Text File
 @mcp.tool()
-def read_text_file_tool(file_path: str, max_lines: int = None):
+def read_text_file_tool(file_path: str, max_lines: int = None) -> Dict[str, Any]:
     """
     Read a text file and return its contents.
     
@@ -586,11 +804,11 @@ def read_text_file_tool(file_path: str, max_lines: int = None):
         # Handle Windows-specific path issues
         file_path = os.path.normpath(file_path)
     
-    return read_text_file(file_path, max_lines)
+    return read_text_file(file_path, max_lines).model_dump()
 
 # MCP Tool: Write Text File
 @mcp.tool()
-def write_text_file_tool(file_path: str, content: str, append: bool = False):
+def write_text_file_tool(file_path: str, content: str, append: bool = False) -> Dict[str, Any]:
     """
     Write content to a text file.
     
@@ -607,11 +825,11 @@ def write_text_file_tool(file_path: str, content: str, append: bool = False):
         # Handle Windows-specific path issues
         file_path = os.path.normpath(file_path)
     
-    return write_text_file(file_path, content, append)
+    return write_text_file(file_path, content, append).model_dump()
 
 # MCP Tool: Search Files
 @mcp.tool()
-def search_files_tool(directory_path: str, query: str, recursive: bool = True, file_types: list = None):
+def search_files_tool(directory_path: str, query: str, recursive: bool = True, file_types: list = None) -> Dict[str, Any]:
     """
     Search for files matching a query in a directory.
     
@@ -631,21 +849,36 @@ def search_files_tool(directory_path: str, query: str, recursive: bool = True, f
     
     # Check if the directory exists
     if not os.path.isdir(directory_path):
-        return {"error": f"Directory not found: {directory_path}"}
+        return SearchFilesResult(
+            directory=directory_path,
+            query=query,
+            match_count=0,
+            matches=[],
+            error=f"Directory not found: {directory_path}"
+        ).model_dump()
     
     # Search the directory
     results = search_files(directory_path, query, recursive, file_types)
     
-    return {
-        "directory": directory_path,
-        "query": query,
-        "match_count": len(results) if isinstance(results, list) else 0,
-        "matches": results
-    }
+    if isinstance(results, dict) and "error" in results:
+        return SearchFilesResult(
+            directory=directory_path,
+            query=query,
+            match_count=0,
+            matches=[],
+            error=results["error"]
+        ).model_dump()
+    
+    return SearchFilesResult(
+        directory=directory_path,
+        query=query,
+        match_count=len(results),
+        matches=results
+    ).model_dump()
 
 # MCP Tool: Search File Contents
 @mcp.tool()
-def search_file_contents_tool(directory_path: str, query: str, recursive: bool = True, file_types: list = None, max_results: int = 100):
+def search_file_contents_tool(directory_path: str, query: str, recursive: bool = True, file_types: list = None, max_results: int = 100) -> Dict[str, Any]:
     """
     Search for files containing a query in their contents.
     
@@ -666,21 +899,36 @@ def search_file_contents_tool(directory_path: str, query: str, recursive: bool =
     
     # Check if the directory exists
     if not os.path.isdir(directory_path):
-        return {"error": f"Directory not found: {directory_path}"}
+        return SearchFileContentsResult(
+            directory=directory_path,
+            query=query,
+            match_count=0,
+            matches=[],
+            error=f"Directory not found: {directory_path}"
+        ).model_dump()
     
     # Search the directory
     results = search_file_contents(directory_path, query, recursive, file_types, max_results)
     
-    return {
-        "directory": directory_path,
-        "query": query,
-        "match_count": len(results) if isinstance(results, list) else 0,
-        "matches": results
-    }
+    if isinstance(results, dict) and "error" in results:
+        return SearchFileContentsResult(
+            directory=directory_path,
+            query=query,
+            match_count=0,
+            matches=[],
+            error=results["error"]
+        ).model_dump()
+    
+    return SearchFileContentsResult(
+        directory=directory_path,
+        query=query,
+        match_count=len(results),
+        matches=results
+    ).model_dump()
 
 # MCP Tool: Get System Information
 @mcp.tool()
-def get_system_info():
+def get_system_info() -> Dict[str, Any]:
     """
     Get information about the system.
     
@@ -718,13 +966,25 @@ def get_system_info():
             except Exception as e:
                 info["environment_error"] = str(e)
         
-        return {"system_info": info}
+        return SystemInfoResult(system_info=SystemInfo(**info)).model_dump()
     except Exception as e:
-        return {"error": str(e)}
+        return SystemInfoResult(
+            system_info=SystemInfo(
+                system=platform.system(),
+                node="unknown",
+                release="unknown",
+                version="unknown",
+                machine="unknown",
+                processor="unknown",
+                python_version=platform.python_version(),
+                user_home=os.path.expanduser("~")
+            ),
+            error=str(e)
+        ).model_dump()
 
 # MCP Tool: Copy File
 @mcp.tool()
-def copy_file(source_path: str, destination_path: str, overwrite: bool = False):
+def copy_file(source_path: str, destination_path: str, overwrite: bool = False) -> Dict[str, Any]:
     """
     Copy a file from source to destination.
     
@@ -744,11 +1004,23 @@ def copy_file(source_path: str, destination_path: str, overwrite: bool = False):
         
         # Check if the source file exists
         if not os.path.isfile(source_path):
-            return {"error": f"Source file not found: {source_path}"}
+            return FileCopyResult(
+                success=False,
+                source=source_path,
+                destination=destination_path,
+                size=0,
+                error=f"Source file not found: {source_path}"
+            ).model_dump()
         
         # Check if the destination file exists
         if os.path.exists(destination_path) and not overwrite:
-            return {"error": f"Destination file already exists: {destination_path}"}
+            return FileCopyResult(
+                success=False,
+                source=source_path,
+                destination=destination_path,
+                size=0,
+                error=f"Destination file already exists: {destination_path}"
+            ).model_dump()
         
         # Create destination directory if it doesn't exist
         os.makedirs(os.path.dirname(os.path.abspath(destination_path)), exist_ok=True)
@@ -756,18 +1028,24 @@ def copy_file(source_path: str, destination_path: str, overwrite: bool = False):
         # Copy the file
         shutil.copy2(source_path, destination_path)
         
-        return {
-            "success": True,
-            "source": source_path,
-            "destination": destination_path,
-            "size": os.path.getsize(destination_path)
-        }
+        return FileCopyResult(
+            success=True,
+            source=source_path,
+            destination=destination_path,
+            size=os.path.getsize(destination_path)
+        ).model_dump()
     except Exception as e:
-        return {"error": str(e)}
+        return FileCopyResult(
+            success=False,
+            source=source_path,
+            destination=destination_path,
+            size=0,
+            error=str(e)
+        ).model_dump()
 
 # MCP Tool: Move File
 @mcp.tool()
-def move_file(source_path: str, destination_path: str, overwrite: bool = False):
+def move_file(source_path: str, destination_path: str, overwrite: bool = False) -> Dict[str, Any]:
     """
     Move a file from source to destination.
     
@@ -787,30 +1065,51 @@ def move_file(source_path: str, destination_path: str, overwrite: bool = False):
         
         # Check if the source file exists
         if not os.path.isfile(source_path):
-            return {"error": f"Source file not found: {source_path}"}
+            return FileMoveResult(
+                success=False,
+                source=source_path,
+                destination=destination_path,
+                size=0,
+                error=f"Source file not found: {source_path}"
+            ).model_dump()
         
         # Check if the destination file exists
         if os.path.exists(destination_path) and not overwrite:
-            return {"error": f"Destination file already exists: {destination_path}"}
+            return FileMoveResult(
+                success=False,
+                source=source_path,
+                destination=destination_path,
+                size=0,
+                error=f"Destination file already exists: {destination_path}"
+            ).model_dump()
         
         # Create destination directory if it doesn't exist
         os.makedirs(os.path.dirname(os.path.abspath(destination_path)), exist_ok=True)
         
+        # Get file size before moving
+        file_size = os.path.getsize(source_path)
+        
         # Move the file
         shutil.move(source_path, destination_path)
         
-        return {
-            "success": True,
-            "source": source_path,
-            "destination": destination_path,
-            "size": os.path.getsize(destination_path)
-        }
+        return FileMoveResult(
+            success=True,
+            source=source_path,
+            destination=destination_path,
+            size=file_size
+        ).model_dump()
     except Exception as e:
-        return {"error": str(e)}
+        return FileMoveResult(
+            success=False,
+            source=source_path,
+            destination=destination_path,
+            size=0,
+            error=str(e)
+        ).model_dump()
 
 # MCP Tool: Delete File
 @mcp.tool()
-def delete_file(file_path: str):
+def delete_file(file_path: str) -> Dict[str, Any]:
     """
     Delete a file.
     
@@ -827,28 +1126,44 @@ def delete_file(file_path: str):
         
         # Check if the file exists
         if not os.path.isfile(file_path):
-            return {"error": f"File not found: {file_path}"}
+            return FileDeleteResult(
+                success=False,
+                deleted_file=FileDeleteInfo(
+                    path=file_path,
+                    name=os.path.basename(file_path),
+                    size=0
+                ),
+                error=f"File not found: {file_path}"
+            ).model_dump()
         
         # Get file info before deletion
-        file_info = {
-            "path": file_path,
-            "name": os.path.basename(file_path),
-            "size": os.path.getsize(file_path)
-        }
+        file_info = FileDeleteInfo(
+            path=file_path,
+            name=os.path.basename(file_path),
+            size=os.path.getsize(file_path)
+        )
         
         # Delete the file
         os.remove(file_path)
         
-        return {
-            "success": True,
-            "deleted_file": file_info
-        }
+        return FileDeleteResult(
+            success=True,
+            deleted_file=file_info
+        ).model_dump()
     except Exception as e:
-        return {"error": str(e)}
+        return FileDeleteResult(
+            success=False,
+            deleted_file=FileDeleteInfo(
+                path=file_path,
+                name=os.path.basename(file_path),
+                size=0
+            ),
+            error=str(e)
+        ).model_dump()
 
 # MCP Tool: Create Directory
 @mcp.tool()
-def create_directory(directory_path: str):
+def create_directory(directory_path: str) -> Dict[str, Any]:
     """
     Create a directory.
     
@@ -866,16 +1181,20 @@ def create_directory(directory_path: str):
         # Create the directory
         os.makedirs(directory_path, exist_ok=True)
         
-        return {
-            "success": True,
-            "path": directory_path
-        }
+        return DirectoryCreateResult(
+            success=True,
+            path=directory_path
+        ).model_dump()
     except Exception as e:
-        return {"error": str(e)}
+        return DirectoryCreateResult(
+            success=False,
+            path=directory_path,
+            error=str(e)
+        ).model_dump()
 
 # MCP Tool: List Directory
 @mcp.tool()
-def list_directory(directory_path: str):
+def list_directory(directory_path: str) -> Dict[str, Any]:
     """
     List the contents of a directory.
     
@@ -892,7 +1211,14 @@ def list_directory(directory_path: str):
         
         # Check if the directory exists
         if not os.path.isdir(directory_path):
-            return {"error": f"Directory not found: {directory_path}"}
+            return DirectoryListing(
+                path=directory_path,
+                files=[],
+                directories=[],
+                file_count=0,
+                directory_count=0,
+                error=f"Directory not found: {directory_path}"
+            ).model_dump()
         
         # List the directory contents
         items = os.listdir(directory_path)
@@ -904,27 +1230,117 @@ def list_directory(directory_path: str):
             item_path = os.path.join(directory_path, item)
             
             if os.path.isfile(item_path):
-                files.append({
-                    "name": item,
-                    "path": item_path,
-                    "size": os.path.getsize(item_path),
-                    "type": get_file_type(item_path)
-                })
+                files.append(FileItem(
+                    name=item,
+                    path=item_path,
+                    size=os.path.getsize(item_path),
+                    type=get_file_type(item_path)
+                ))
             elif os.path.isdir(item_path):
-                directories.append({
-                    "name": item,
-                    "path": item_path
-                })
+                directories.append(DirectoryItem(
+                    name=item,
+                    path=item_path
+                ))
         
-        return {
-            "path": directory_path,
-            "files": files,
-            "directories": directories,
-            "file_count": len(files),
-            "directory_count": len(directories)
-        }
+        return DirectoryListing(
+            path=directory_path,
+            files=files,
+            directories=directories,
+            file_count=len(files),
+            directory_count=len(directories)
+        ).model_dump()
     except Exception as e:
-        return {"error": str(e)}
+        return DirectoryListing(
+            path=directory_path,
+            files=[],
+            directories=[],
+            file_count=0,
+            directory_count=0,
+            error=str(e)
+        ).model_dump()
+
+# MCP Tool: List Directory Recursively
+@mcp.tool()
+def list_directory_recursively(directory_path: str, max_depth: int = 3) -> Dict[str, Any]:
+    """
+    List the contents of a directory recursively, showing the directory structure.
+    
+    Args:
+        directory_path: The path to the directory to list
+        max_depth: Maximum depth of recursion (default: 3)
+    
+    Returns:
+        A string representation of the directory structure
+    """
+    try:
+        # Validate and normalize the path
+        if SYSTEM == "Windows":
+            directory_path = os.path.normpath(directory_path)
+        
+        # Check if the directory exists
+        if not os.path.isdir(directory_path):
+            return RecursiveDirectoryListing(
+                path=directory_path,
+                structure="",
+                file_count=0,
+                directory_count=0,
+                error=f"Directory not found: {directory_path}"
+            ).model_dump()
+        
+        def build_tree(path: str, prefix: str = "", depth: int = 0) -> tuple[str, int, int]:
+            if depth >= max_depth:
+                return "", 0, 0
+            
+            tree = []
+            file_count = 0
+            dir_count = 0
+            
+            try:
+                items = os.listdir(path)
+                items.sort(key=lambda x: (not os.path.isdir(os.path.join(path, x)), x.lower()))
+                
+                for i, item in enumerate(items):
+                    is_last = i == len(items) - 1
+                    item_path = os.path.join(path, item)
+                    
+                    # Add the current item to the tree
+                    tree.append(f"{prefix}{'└── ' if is_last else '├── '}{item}")
+                    
+                    if os.path.isdir(item_path):
+                        dir_count += 1
+                        # Recursively process subdirectories
+                        sub_tree, sub_files, sub_dirs = build_tree(
+                            item_path,
+                            prefix + ('    ' if is_last else '│   '),
+                            depth + 1
+                        )
+                        tree.append(sub_tree)
+                        file_count += sub_files
+                        dir_count += sub_dirs
+                    else:
+                        file_count += 1
+                
+                return '\n'.join(tree), file_count, dir_count
+            except Exception as e:
+                return f"Error reading directory: {str(e)}", 0, 0
+        
+        # Build the tree structure
+        tree_structure, file_count, dir_count = build_tree(directory_path)
+        
+        return RecursiveDirectoryListing(
+            path=directory_path,
+            structure=tree_structure,
+            file_count=file_count,
+            directory_count=dir_count
+        ).model_dump()
+    except Exception as e:
+        return RecursiveDirectoryListing(
+            path=directory_path,
+            structure="",
+            file_count=0,
+            directory_count=0,
+            error=str(e)
+        ).model_dump()
 
 # Start the MCP server
 if __name__ == "__main__":
