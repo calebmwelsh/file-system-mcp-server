@@ -38,8 +38,38 @@ file-system-mcp-server/
 │   ├── userdata/           # User-specific data
 │   └── collections/        # File collections
 ├── fs_server.py            # Main server implementation
+├── windows_utils.py        # Windows-specific utilities (optional)
+├── media_utils.py          # Media file handling utilities (optional)
 ├── requirements.txt        # Project dependencies
 └── test_prompts_example.md # Example test prompts
+```
+
+## Dependencies
+
+### Required Dependencies
+- FastMCP
+- Pydantic
+
+### Optional Dependencies
+The following dependencies are optional and enable additional features:
+
+1. **Windows-specific Features** (`windows_utils.py`)
+   - Drive listing
+   - Special folders access
+   - Windows environment variables
+   - Windows system information
+   - Windows path validation and normalization
+
+2. **Media File Handling** (`media_utils.py`)
+   - Image metadata extraction (requires Pillow)
+   - Video metadata extraction (requires ffmpeg-python)
+   - Audio metadata extraction (requires mutagen)
+   - Thumbnail generation
+   - File organization by date
+
+To install optional dependencies:
+```bash
+pip install Pillow ffmpeg-python mutagen
 ```
 
 ## Setup
@@ -63,14 +93,32 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Start the server:
-```bash
-python fs_server.py
-```
+### Setting up with Claude
 
-2. The server will create necessary directories in the `data` folder and start listening for requests.
+1. Open Claude's settings:
+   - Press `Ctrl+,` (Windows/Linux) or `Cmd+,` (Mac)
+   - Or click on the gear icon in the bottom left corner and select "Settings"
 
-3. Use the provided test prompts in `test_prompts_example.md` as examples for interacting with the server.
+2. In the settings search bar, type "mcp"
+
+3. Add the file system server to your MCP servers configuration:
+   ```json
+   {
+     "mcpServers": {
+       "file-system": {
+         "command": "python",
+         "args": [
+           "path/to/file-system-mcp-server/fs_server.py"
+         ]
+       }
+     }
+   }
+   ```
+   Replace `path/to/file-system-mcp-server` with the actual path to your installation.
+
+4. Restart Claude to apply the changes
+
+5. You can now use the file system tools by asking Claude to perform file operations.
 
 ## Available Tools
 
