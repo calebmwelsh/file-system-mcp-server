@@ -97,17 +97,19 @@ file-system-mcp-server/
 - FastMCP
 - Pydantic
 
-### Optional Dependencies
-The following dependencies are optional and enable additional features:
+### Platform-Specific Dependencies
+The following dependencies are required for Windows functionality:
 
-1. **Windows-specific Features** (`windows_utils.py`)
-   - Drive listing (Windows only)
-   - Special folders access (Windows only)
-   - Windows environment variables (Windows only)
-   - Windows system information (Windows only)
-   - Windows path validation and normalization (Windows only)
+1. **Windows Dependencies** (`windows_utils.py`)
+   - Required for Windows systems
+   - Provides drive listing
+   - Provides special folders access
+   - Provides Windows environment variables
+   - Provides Windows system information
+   - Provides Windows path validation and normalization
+   - Dependencies: pywin32, WMI
 
-To install optional dependencies:
+To install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
