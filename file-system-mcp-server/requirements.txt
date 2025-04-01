@@ -1,0 +1,6 @@
+ffmpeg==1.4
+mcp==1.6.0
+mutagen==1.47.0
+Pillow==11.1.0
+pywin32==308
+wmi==1.5.1
