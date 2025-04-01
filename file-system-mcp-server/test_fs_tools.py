@@ -1,22 +1,21 @@
-#!/usr/bin/env python3
 """
-Test script for Local MCP Server tools.
+Test script for File System MCP Server tools.
 This script tests each of the MCP tools provided by the server.
 """
 
-import os
-import sys
 import json
+import os
 import platform
-import tempfile
 import shutil
+import sys
+import tempfile
 from datetime import datetime
 
 # Determine the operating system
 SYSTEM = platform.system()  # 'Windows', 'Darwin' (macOS), or 'Linux'
 
 # Create a temporary directory for testing
-TEST_DIR = tempfile.mkdtemp(prefix="mcp_test_")
+TEST_DIR = tempfile.mkdtemp(prefix="fs_mcp_test_")
 print(f"Created temporary test directory: {TEST_DIR}")
 
 # Create test files
@@ -83,8 +82,8 @@ def test_scan_directory_tool():
     
     # Import the function from the server module
     try:
-        from media_server import scan_directory_tool
-        
+        from fs_server import scan_directory_tool
+
         # Test with recursive=True
         print("Testing with recursive=True:")
         result = scan_directory_tool(TEST_DIR, True)
@@ -112,8 +111,8 @@ def test_get_file_metadata_tool():
     
     # Import the function from the server module
     try:
-        from media_server import get_file_metadata_tool
-        
+        from fs_server import get_file_metadata_tool
+
         # Test with a text file
         print("Testing with a text file:")
         result = get_file_metadata_tool(os.path.join(TEST_DIR, "test.txt"))
@@ -144,8 +143,8 @@ def test_list_drives():
     
     # Import the function from the server module
     try:
-        from media_server import list_drives
-        
+        from fs_server import list_drives
+
         # This function is Windows-specific
         if SYSTEM == "Windows":
             print("Testing list_drives on Windows:")
@@ -172,7 +171,7 @@ def test_list_user_directories():
     
     # Import the function from the server module
     try:
-        from media_server import list_user_directories
+        from fs_server import list_user_directories
         
         print("Testing list_user_directories:")
         result = list_user_directories()
@@ -195,8 +194,8 @@ def test_read_text_file_tool():
     
     # Import the function from the server module
     try:
-        from media_server import read_text_file_tool
-        
+        from fs_server import read_text_file_tool
+
         # Test reading a text file
         print("Testing reading a text file:")
         result = read_text_file_tool(os.path.join(TEST_DIR, "test.txt"))
@@ -223,8 +222,8 @@ def test_write_text_file_tool():
     
     # Import the function from the server module
     try:
-        from media_server import write_text_file_tool
-        
+        from fs_server import write_text_file_tool
+
         # Test writing a new file
         new_file_path = os.path.join(TEST_DIR, "new_file.txt")
         print(f"Testing writing a new file: {new_file_path}")
@@ -261,8 +260,8 @@ def test_search_files_tool():
     
     # Import the function from the server module
     try:
-        from media_server import search_files_tool
-        
+        from fs_server import search_files_tool
+
         # Test searching for files
         print("Testing searching for files with 'test' in the name:")
         result = search_files_tool(TEST_DIR, "test", True)
@@ -291,8 +290,8 @@ def test_search_file_contents_tool():
     
     # Import the function from the server module
     try:
-        from media_server import search_file_contents_tool
-        
+        from fs_server import search_file_contents_tool
+
         # Test searching for file contents
         print("Testing searching for 'line' in file contents:")
         result = search_file_contents_tool(TEST_DIR, "line", True)
@@ -319,7 +318,7 @@ def test_get_system_info():
     
     # Import the function from the server module
     try:
-        from media_server import get_system_info
+        from fs_server import get_system_info
         
         print("Testing get_system_info:")
         result = get_system_info()
@@ -348,8 +347,8 @@ def test_copy_file():
     
     # Import the function from the server module
     try:
-        from media_server import copy_file
-        
+        from fs_server import copy_file
+
         # Test copying a file
         source_path = os.path.join(TEST_DIR, "test.txt")
         dest_path = os.path.join(TEST_DIR, "test_copy.txt")
@@ -397,8 +396,8 @@ def test_move_file():
     
     # Import the function from the server module
     try:
-        from media_server import move_file
-        
+        from fs_server import move_file
+
         # Create a file to move
         source_path = os.path.join(TEST_DIR, "move_source.txt")
         with open(source_path, "w") as f:
@@ -439,8 +438,8 @@ def test_delete_file():
     
     # Import the function from the server module
     try:
-        from media_server import delete_file
-        
+        from fs_server import delete_file
+
         # Create a file to delete
         file_path = os.path.join(TEST_DIR, "delete_me.txt")
         with open(file_path, "w") as f:
@@ -473,8 +472,8 @@ def test_create_directory():
     
     # Import the function from the server module
     try:
-        from media_server import create_directory
-        
+        from fs_server import create_directory
+
         # Test creating a directory
         dir_path = os.path.join(TEST_DIR, "new_directory")
         print(f"Testing creating directory {dir_path}:")
@@ -512,8 +511,8 @@ def test_list_directory():
     
     # Import the function from the server module
     try:
-        from media_server import list_directory
-        
+        from fs_server import list_directory
+
         # Test listing a directory
         print(f"Testing listing directory {TEST_DIR}:")
         result = list_directory(TEST_DIR)
@@ -543,8 +542,8 @@ def test_create_collection():
     
     # Import the function from the server module
     try:
-        from media_server import create_collection
-        
+        from fs_server import create_collection
+
         # Test creating a collection
         collection_name = "test_collection"
         file_paths = [

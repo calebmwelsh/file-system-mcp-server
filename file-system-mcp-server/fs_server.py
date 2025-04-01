@@ -16,32 +16,17 @@ mcp = FastMCP()
 # Determine the operating system
 SYSTEM = platform.system()  # 'Windows', 'Darwin' (macOS), or 'Linux'
 
-# Set up base directories
-if SYSTEM == "Windows":
-    # Windows-specific paths
-    USER_HOME = os.path.expanduser("~")
-    BASE_DIR = os.path.join(USER_HOME, "LocalMCP")
-    MEDIA_DIR = os.path.join(BASE_DIR, "media")
-    CACHE_DIR = os.path.join(BASE_DIR, "cache")
-    TEMP_DIR = os.path.join(BASE_DIR, "temp")
-    DOCS_DIR = os.path.join(BASE_DIR, "documents")
-    DATA_DIR = os.path.join(BASE_DIR, "data")
-elif SYSTEM == "Darwin":  # macOS
-    USER_HOME = os.path.expanduser("~")
-    BASE_DIR = os.path.join(USER_HOME, "Library", "Application Support", "LocalMCP")
-    MEDIA_DIR = os.path.join(BASE_DIR, "media")
-    CACHE_DIR = os.path.join(BASE_DIR, "cache")
-    TEMP_DIR = os.path.join(BASE_DIR, "temp")
-    DOCS_DIR = os.path.join(BASE_DIR, "documents")
-    DATA_DIR = os.path.join(BASE_DIR, "data")
-else:  # Linux and others
-    USER_HOME = os.path.expanduser("~")
-    BASE_DIR = os.path.join(USER_HOME, ".local", "share", "LocalMCP")
-    MEDIA_DIR = os.path.join(BASE_DIR, "media")
-    CACHE_DIR = os.path.join(BASE_DIR, "cache")
-    TEMP_DIR = os.path.join(BASE_DIR, "temp")
-    DOCS_DIR = os.path.join(BASE_DIR, "documents")
-    DATA_DIR = os.path.join(BASE_DIR, "data")
+# Get the project root directory (parent of src directory)
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+# Set up base directories within the project
+BASE_DIR = os.path.join(PROJECT_ROOT, "data")
+MEDIA_DIR = os.path.join(BASE_DIR, "media")
+CACHE_DIR = os.path.join(BASE_DIR, "cache")
+TEMP_DIR = os.path.join(BASE_DIR, "temp")
+DOCS_DIR = os.path.join(BASE_DIR, "documents")
+DATA_DIR = os.path.join(BASE_DIR, "userdata")
+COLLECTIONS_DIR = os.path.join(BASE_DIR, "collections")
 
 # Create necessary directories if they don't exist
 os.makedirs(BASE_DIR, exist_ok=True)
@@ -50,6 +35,7 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(DOCS_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(COLLECTIONS_DIR, exist_ok=True)
 
 # Initialize mimetypes
 mimetypes.init()
@@ -67,19 +53,6 @@ if SYSTEM == "Windows":
         )
     except ImportError:
         print("Windows utilities could not be imported. Some features may be limited.")
-
-# Import media utilities
-try:
-    from media_utils import (
-        get_image_metadata,
-        get_video_metadata,
-        get_audio_metadata,
-        generate_thumbnail,
-        organize_by_date,
-        detect_file_type
-    )
-except ImportError:
-    print("Media utilities could not be imported. Some features may be limited.")
 
 # Helper functions
 def get_file_type(file_path):
@@ -160,33 +133,8 @@ def get_file_metadata(file_path):
             "type": file_type
         }
         
-        # Get additional metadata based on file type
-        if file_type == 'image' and 'get_image_metadata' in globals():
-            try:
-                image_metadata = get_image_metadata(file_path)
-                if isinstance(image_metadata, dict) and 'error' not in image_metadata:
-                    metadata.update(image_metadata)
-            except Exception as e:
-                metadata["image_error"] = str(e)
-        
-        elif file_type == 'video' and 'get_video_metadata' in globals():
-            try:
-                video_metadata = get_video_metadata(file_path)
-                if isinstance(video_metadata, dict) and 'error' not in video_metadata:
-                    metadata.update(video_metadata)
-            except Exception as e:
-                metadata["video_error"] = str(e)
-        
-        elif file_type == 'audio' and 'get_audio_metadata' in globals():
-            try:
-                audio_metadata = get_audio_metadata(file_path)
-                if isinstance(audio_metadata, dict) and 'error' not in audio_metadata:
-                    metadata.update(audio_metadata)
-            except Exception as e:
-                metadata["audio_error"] = str(e)
-        
         # For text files, include a preview
-        elif file_type in ['text', 'code', 'document'] and os.path.splitext(file_path)[1].lower() in ['.txt', '.md', '.csv', '.json', '.xml', '.html', '.css', '.js', '.py', '.java', '.c', '.cpp', '.h', '.cs', '.php', '.rb', '.go', '.rs', '.ts']:
+        if file_type in ['text', 'code', 'document'] and os.path.splitext(file_path)[1].lower() in ['.txt', '.md', '.csv', '.json', '.xml', '.html', '.css', '.js', '.py', '.java', '.c', '.cpp', '.h', '.cs', '.php', '.rb', '.go', '.rs', '.ts']:
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                     # Read first 1000 characters as preview
@@ -517,7 +465,7 @@ def create_collection(name: str, file_paths: list):
     Returns:
         Information about the created collection
     """
-    collection_dir = os.path.join(BASE_DIR, "collections", name)
+    collection_dir = os.path.join(COLLECTIONS_DIR, name)
     os.makedirs(collection_dir, exist_ok=True)
     
     collection_info = {
@@ -980,7 +928,8 @@ def list_directory(directory_path: str):
 
 # Start the MCP server
 if __name__ == "__main__":
-    print(f"Local MCP Server starting...")
+    print(f"File System MCP Server starting...")
     print(f"Operating System: {SYSTEM}")
+    print(f"Project Root: {PROJECT_ROOT}")
     print(f"Base Directory: {BASE_DIR}")
     mcp.run()
