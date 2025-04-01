@@ -2,6 +2,54 @@
 
 A powerful file system management server built with FastMCP that provides a comprehensive set of tools for file and directory operations. This server allows you to perform various file system operations through a structured API, making it ideal for automation and integration with other systems.
 
+## Platform Support
+
+The server is designed to work across different operating systems, but with varying levels of functionality:
+
+### Windows
+- Full feature support
+- Drive listing
+- Special folders access
+- Windows-specific path handling
+- Detailed system information
+
+### macOS/Linux
+- Basic file operations
+- Directory operations
+- File search and metadata
+- Basic system information
+- Note: Some Windows-specific features are not available
+
+## Future Implementation
+
+### Planned macOS Support
+- Native path handling for macOS
+- macOS-specific system information retrieval
+- Integration with macOS file system features
+- Support for macOS-specific file attributes
+- Implementation of macOS-specific utilities (similar to windows_utils.py)
+
+### Planned Linux Support
+- Native path handling for Linux
+- Linux-specific system information retrieval
+- Integration with Linux file system features
+- Support for Linux file permissions and attributes
+- Implementation of Linux-specific utilities
+
+### Cross-Platform Improvements
+- Unified path handling system
+- Platform-agnostic drive detection
+- Consistent system information API
+- Standardized file attributes across platforms
+- Cross-platform file system event monitoring
+- Universal file collection system
+
+### Timeline
+- Phase 1: Basic cross-platform compatibility improvements
+- Phase 2: Platform-specific feature implementations
+- Phase 3: Advanced cross-platform features
+- Phase 4: Performance optimizations and refinements
+
 ## Features
 
 ### File Operations
@@ -38,7 +86,7 @@ file-system-mcp-server/
 │   ├── userdata/           # User-specific data
 │   └── collections/        # File collections
 ├── fs_server.py            # Main server implementation
-├── windows_utils.py        # Windows-specific utilities (optional)
+├── windows_utils.py        # Windows-specific utilities (Windows only)
 ├── media_utils.py          # Media file handling utilities (optional)
 ├── requirements.txt        # Project dependencies
 └── test_prompts_example.md # Example test prompts
@@ -54,11 +102,11 @@ file-system-mcp-server/
 The following dependencies are optional and enable additional features:
 
 1. **Windows-specific Features** (`windows_utils.py`)
-   - Drive listing
-   - Special folders access
-   - Windows environment variables
-   - Windows system information
-   - Windows path validation and normalization
+   - Drive listing (Windows only)
+   - Special folders access (Windows only)
+   - Windows environment variables (Windows only)
+   - Windows system information (Windows only)
+   - Windows path validation and normalization (Windows only)
 
 2. **Media File Handling** (`media_utils.py`)
    - Image metadata extraction (requires Pillow)
@@ -93,32 +141,78 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Setting up with Claude
+### Integration with Claude
 
-1. Open Claude's settings:
-   - Press `Ctrl+,` (Windows/Linux) or `Cmd+,` (Mac)
-   - Or click on the gear icon in the bottom left corner and select "Settings"
+To integrate the File System MCP server with Claude, add the following to your `claude_desktop_config.json` file:
 
-2. In the settings search bar, type "mcp"
+```json
+{
+  "mcpServers": {
+    "file-system": {
+      "command": "/absolute/path/to/python",
+      "args": [
+        "/absolute/path/to/file-system-mcp-server/fs_server.py"
+      ]
+    }
+  }
+}
+```
 
-3. Add the file system server to your MCP servers configuration:
-   ```json
-   {
-     "mcpServers": {
-       "file-system": {
-         "command": "python",
-         "args": [
-           "path/to/file-system-mcp-server/fs_server.py"
-         ]
-       }
-     }
-   }
-   ```
-   Replace `path/to/file-system-mcp-server` with the actual path to your installation.
+#### Finding Your Python Path
 
-4. Restart Claude to apply the changes
+To find your Python executable path, use the following command:
 
-5. You can now use the file system tools by asking Claude to perform file operations.
+**Windows (PowerShell):**
+```powershell
+(Get-Command python).Source
+```
+
+**Windows (Command Prompt/Terminal):**
+```cmd
+where python
+```
+
+**Linux/macOS (Terminal):**
+```bash
+which python
+```
+
+Replace `/absolute/path/to/python` with the output from the appropriate command above.
+
+#### Example Configuration
+
+For Windows, your configuration might look like this:
+```json
+{
+  "mcpServers": {
+    "file-system": {
+      "command": "C:\\Users\\YourUsername\\AppData\\Local\\Programs\\Python\\Python39\\python.exe",
+      "args": [
+        "C:\\Users\\YourUsername\\Documents\\file-system-mcp-server\\fs_server.py"
+      ]
+    }
+  }
+}
+```
+
+For macOS/Linux:
+```json
+{
+  "mcpServers": {
+    "file-system": {
+      "command": "/usr/local/bin/python3",
+      "args": [
+        "/Users/YourUsername/Documents/file-system-mcp-server/fs_server.py"
+      ]
+    }
+  }
+}
+```
+
+After adding the configuration:
+1. Save the `claude_desktop_config.json` file
+2. Restart Claude
+3. You can now use the file system tools by asking Claude to perform file operations
 
 ## Available Tools
 
@@ -158,6 +252,11 @@ The following features are currently experiencing issues and may not work as exp
    - Some drives may be missing from the list or show incorrect information
    - This is a known limitation and will be addressed in future updates
 
+3. **Platform-Specific Limitations**
+   - Windows-specific features are not available on macOS/Linux
+   - Some path handling may differ between platforms
+   - System information retrieval varies by platform
+
 ## Error Handling
 
 The server includes comprehensive error handling for:
@@ -166,6 +265,7 @@ The server includes comprehensive error handling for:
 - Permission issues
 - Disk space limitations
 - Invalid operations
+- Platform-specific errors
 
 ## Security
 
