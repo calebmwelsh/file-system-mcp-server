@@ -87,7 +87,6 @@ file-system-mcp-server/
 │   └── collections/        # File collections
 ├── fs_server.py            # Main server implementation
 ├── windows_utils.py        # Windows-specific utilities (Windows only)
-├── media_utils.py          # Media file handling utilities (optional)
 ├── requirements.txt        # Project dependencies
 └── test_prompts_example.md # Example test prompts
 ```
@@ -108,16 +107,9 @@ The following dependencies are optional and enable additional features:
    - Windows system information (Windows only)
    - Windows path validation and normalization (Windows only)
 
-2. **Media File Handling** (`media_utils.py`)
-   - Image metadata extraction (requires Pillow)
-   - Video metadata extraction (requires ffmpeg-python)
-   - Audio metadata extraction (requires mutagen)
-   - Thumbnail generation
-   - File organization by date
-
 To install optional dependencies:
 ```bash
-pip install Pillow ffmpeg-python mutagen
+pip install -r requirements.txt
 ```
 
 ## Setup
