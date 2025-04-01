@@ -78,17 +78,23 @@ The server is designed to work across different operating systems, but with vary
 
 ```
 file-system-mcp-server/
-├── data/                    # Data storage directory
-│   ├── media/              # Media files
-│   ├── cache/              # Cache files
-│   ├── temp/               # Temporary files
-│   ├── documents/          # Document files
-│   ├── userdata/           # User-specific data
-│   └── collections/        # File collections
 ├── fs_server.py            # Main server implementation
 ├── windows_utils.py        # Windows-specific utilities (Windows only)
 ├── requirements.txt        # Project dependencies
 └── test_prompts_example.md # Example test prompts
+```
+
+### Collections Storage
+
+Collections can be stored in any directory specified by the user. If no storage location is specified, collections will be stored in a default location within the project's `data/collections` directory.
+
+Example usage:
+```python
+# Store in default location
+create_collection("my_collection", ["file1.txt", "file2.txt"])
+
+# Store in custom location
+create_collection("my_collection", ["file1.txt", "file2.txt"], storage_path="/path/to/store")
 ```
 
 ## Dependencies
@@ -172,7 +178,7 @@ For Windows, your configuration might look like this:
     "file-system": {
       "command": "C:\\Users\\YourUsername\\AppData\\Local\\Programs\\Python\\Python39\\python.exe",
       "args": [
-        "C:\\Users\\YourUsername\\Documents\\file-system-mcp-server\\fs_server.py"
+        "C:\\Users\\YourUsername\\Documents/file-system-mcp-server/fs_server.py"
       ]
     }
   }

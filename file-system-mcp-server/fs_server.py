@@ -21,23 +21,13 @@ SYSTEM = platform.system()  # 'Windows', 'Darwin' (macOS), or 'Linux'
 # Get the project root directory (parent of src directory)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-# Set up base directories within the project
-BASE_DIR = os.path.join(PROJECT_ROOT, "data")
-MEDIA_DIR = os.path.join(BASE_DIR, "media")
-CACHE_DIR = os.path.join(BASE_DIR, "cache")
-TEMP_DIR = os.path.join(BASE_DIR, "temp")
-DOCS_DIR = os.path.join(BASE_DIR, "documents")
-DATA_DIR = os.path.join(BASE_DIR, "userdata")
-COLLECTIONS_DIR = os.path.join(BASE_DIR, "collections")
+# Set up default directories within the project
+DEFAULT_BASE_DIR = os.path.join(PROJECT_ROOT, "data")
+DEFAULT_COLLECTIONS_DIR = os.path.join(DEFAULT_BASE_DIR, "collections")
 
-# Create necessary directories if they don't exist
-os.makedirs(BASE_DIR, exist_ok=True)
-os.makedirs(MEDIA_DIR, exist_ok=True)
-os.makedirs(CACHE_DIR, exist_ok=True)
-os.makedirs(TEMP_DIR, exist_ok=True)
-os.makedirs(DOCS_DIR, exist_ok=True)
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(COLLECTIONS_DIR, exist_ok=True)
+# Create default directories if they don't exist
+os.makedirs(DEFAULT_BASE_DIR, exist_ok=True)
+os.makedirs(DEFAULT_COLLECTIONS_DIR, exist_ok=True)
 
 # Initialize mimetypes
 mimetypes.init()
@@ -657,18 +647,20 @@ def list_drives() -> Dict[str, Any]:
 
 # MCP Tool: Create Collection
 @mcp.tool()
-def create_collection(name: str, file_paths: list) -> Dict[str, Any]:
+def create_collection(name: str, file_paths: list, storage_path: str = None) -> Dict[str, Any]:
     """
     Create a collection of files.
     
     Args:
         name: The name of the collection
         file_paths: List of file paths to include in the collection
+        storage_path: Optional path where to store the collection. If not provided, uses default location.
     
     Returns:
         Information about the created collection
     """
-    collection_dir = os.path.join(COLLECTIONS_DIR, name)
+    # Use provided storage path or default to collections directory
+    collection_dir = os.path.join(storage_path if storage_path else DEFAULT_COLLECTIONS_DIR, name)
     
     try:
         os.makedirs(collection_dir, exist_ok=True)
@@ -1347,5 +1339,5 @@ if __name__ == "__main__":
     print(f"File System MCP Server starting...")
     print(f"Operating System: {SYSTEM}")
     print(f"Project Root: {PROJECT_ROOT}")
-    print(f"Base Directory: {BASE_DIR}")
+    print(f"Default Collections Directory: {DEFAULT_COLLECTIONS_DIR}")
     mcp.run()
