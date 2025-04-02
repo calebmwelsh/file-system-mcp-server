@@ -131,6 +131,9 @@ pip install -r requirements.txt
 
 ## Usage
 
+For detailed MCP configuration instructions across different development environments (Claude, Cursor, Windsurf), visit:
+[MCP Configuration Guide](https://calebmwelsh.github.io/Configure-MCP/)
+
 ### Integration with Claude
 
 To integrate the File System MCP server with Claude, add the following to your `claude_desktop_config.json` file:
